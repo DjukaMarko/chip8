@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <SDL2/SDL.h>
 
 #define memsize 0x1000
 
@@ -40,6 +41,8 @@ typedef struct chip_8 {
     uint8_t keyboard[0x10];
     uint16_t opcode;
 
+    uint8_t keymap[0x10];
+
 } chip_8;
 
 void initialize_chip(char *filepath) {
@@ -56,11 +59,41 @@ void initialize_chip(char *filepath) {
     memset(ch8.keyboard, 0, sizeof(ch8.keyboard));
     memset(ch8.memory, 0, sizeof(ch8.memory));
 
+    uint8_t buffer_keys[0x10] = {
+        SDLK_0,
+        SDLK_1,
+        SDLK_2,
+        SDLK_3,
+        SDLK_4,
+        SDLK_5,
+        SDLK_6,
+        SDLK_7,
+        SDLK_8,
+        SDLK_9,
+        SDLK_a,
+        SDLK_b,
+        SDLK_c,
+        SDLK_d,
+        SDLK_e,
+        SDLK_f
+    };
+
+    memset(ch8.keymap, buffer_keys, sizeof(ch8.keymap));
     ch8.game = fopen(filepath, "rb");
-    fseek(ch8.game, 0, SEEK_END);
-    long size = ftell(ch8.game);
-    fseek(ch8.game, SEEK_END, 0);
-    fread(ch8.memory+0x200, 1, size, ch8.game);
+    
+    if(ch8.game == NULL) {
+        perror("Error: ");
+        fflush(stdin);
+    } else {
+        fseek(ch8.game, 0, SEEK_END);
+        long size = ftell(ch8.game);
+        printf("Size of the game is 0x%lx\n", size);
+        fseek(ch8.game, 0, SEEK_SET);
+        fread(ch8.memory+0x200, 1, size, ch8.game);
+        if(feof(ch8.game)) {
+            printf("bruh %lx\n", ftell(ch8.game));
+        }
+    }
 
     for(int i = 0; i < 80; i++) {
         ch8.memory[i] = font_set[i];
@@ -69,7 +102,7 @@ void initialize_chip(char *filepath) {
     for(int j = 0; j < memsize; j++) {
         printf("%x ", ch8.memory[j]);
     }
-    
+
 }
 
 void decrement_timers(chip_8 *chip) {
