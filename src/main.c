@@ -25,41 +25,7 @@ uint8_t font_set[16*5] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
 
-
-typedef struct chip_8 {
-    FILE *game;
-
-    uint8_t memory[memsize]; //0x1000 hex == 4096 dec
-    uint8_t V[0x10]; // 16 V registers
-    uint16_t I; // I register for storing memory addresses
-    uint8_t delay_timer;
-    uint8_t sound_timer;
-    uint16_t pc;
-    uint8_t sp;
-    uint16_t stack[0x10];
-    uint8_t display[64*32];
-    uint8_t keyboard[0x10];
-    uint16_t opcode;
-
-    uint8_t keymap[0x10];
-
-} chip_8;
-
-void initialize_chip(char *filepath) {
-    chip_8 ch8;
-    ch8.pc = 0x200;
-    ch8.sp = 0;
-    ch8.opcode = 0x200;
-    ch8.I = 0;
-    ch8.delay_timer = 0;
-    ch8.sound_timer = 0;
-    memset(ch8.V, 0, sizeof(ch8.V));
-    memset(ch8.stack, 0, sizeof(ch8.stack));
-    memset(ch8.display, 0, sizeof(ch8.display));
-    memset(ch8.keyboard, 0, sizeof(ch8.keyboard));
-    memset(ch8.memory, 0, sizeof(ch8.memory));
-
-    uint8_t buffer_keys[0x10] = {
+uint8_t buffer_keys[0x10] = {
         SDLK_0,
         SDLK_1,
         SDLK_2,
@@ -78,7 +44,40 @@ void initialize_chip(char *filepath) {
         SDLK_f
     };
 
-    memset(ch8.keymap, buffer_keys, sizeof(ch8.keymap));
+
+typedef struct chip_8 {
+    FILE *game;
+
+    uint8_t memory[memsize]; //0x1000 hex == 4096 dec
+    uint8_t V[0x10]; // 16 V registers, the last one is Vf and it's used as a flag.
+    uint16_t I; // I register for storing memory addresses
+    uint8_t delay_timer;
+    uint8_t sound_timer;
+    uint16_t pc;
+    uint8_t sp;
+    uint16_t stack[0x10];
+    uint8_t display[64*32];
+    uint8_t keyboard[0x10];
+    uint16_t opcode;
+
+
+} chip_8;
+
+void initialize_chip(char *filepath) {
+    chip_8 ch8;
+    ch8.pc = 0x200;
+    ch8.sp = 0;
+    ch8.opcode = 0x200;
+    ch8.I = 0;
+    ch8.delay_timer = 0;
+    ch8.sound_timer = 0;
+    memset(ch8.V, 0, sizeof(ch8.V));
+    memset(ch8.stack, 0, sizeof(ch8.stack));
+    memset(ch8.display, 0, sizeof(ch8.display));
+    memset(ch8.keyboard, 0, sizeof(ch8.keyboard));
+    memset(ch8.memory, 0, sizeof(ch8.memory));
+    memcpy(ch8.keyboard, buffer_keys, sizeof(buffer_keys));
+
     ch8.game = fopen(filepath, "rb");
     
     if(ch8.game == NULL) {
@@ -103,6 +102,87 @@ void initialize_chip(char *filepath) {
         printf("%x ", ch8.memory[j]);
     }
 
+}
+
+
+void chip8_opcodes(chip_8 *ch8) {
+    ch8->opcode = ch8->memory[ch8->pc] << 8 | ch8->memory[ch8->pc + 1];
+    ch8->pc += 2;
+
+    uint8_t Vx = (ch8->opcode & 0x0F00);
+    uint8_t Vy = (ch8->opcode & 0x00F0);
+    switch(ch8->opcode & 0xF000) {
+        case 0x000:
+            switch(ch8->opcode & 0x0FFF) {
+                case 0x00E0: //CLS
+                    memset(ch8->display, 0, sizeof(ch8->display));
+                    break;
+                case 0x00EE: //RET
+                    ch8->pc = ch8->stack[ch8->sp];
+                    ch8->sp--;
+                    break;
+            }
+        case 0x1000: //JMP
+            ch8->pc = ch8->opcode & 0x0FFF;
+            break;
+        case 0x2000: //CALL
+            ch8->sp++;
+            ch8->stack[ch8->sp] = ch8->pc;
+            ch8->pc = ch8->opcode & 0x0FFF;
+            break;
+        case 0x3000: //SE Vx, byte
+            if(ch8->V[Vx] == (ch8->opcode & 0x00FF)) ch8->pc += 2;
+            break;
+        case 0x4000: //SNE Vx, byte
+            if(ch8->V[Vx] != (ch8->opcode & 0x00FF)) ch8->pc += 2;
+            break;
+        case 0x5000: // SE Vx, Vy
+            if(ch8->V[Vx] == ch8->V[Vy]) ch8->pc += 2;
+            break;
+        case 0x6000: // LD Vx, byte
+            ch8->V[Vx] = ch8->opcode & 0x00FF;
+            break;
+        case 0x7000: // ADD Vx, byte
+            ch8->V[Vx] = ch8->V[Vx] + (ch8->opcode & 0x00FF);
+            break;
+        case 0x8000: 
+            switch(ch8->opcode & 0x000F) {
+                case 0x0000: // LD Vx, Vy
+                    ch8->V[Vx] = ch8->V[Vy];
+                    break;
+                case 0x0001: // OR Vx, Vy
+                    ch8->V[Vx] |= ch8->V[Vy];
+                    break;
+                case 0x0002: // AND Vx, Vy
+                    ch8->V[Vx] &= ch8->V[Vy];
+                    break;
+                case 0x0003: // XOR Vx, Vy
+                    ch8->V[Vx] ^= ch8->V[Vy];
+                    break;
+                case 0x0004: // ADD Vx, Vy
+                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] + ch8->V[Vy] > 0xFF;
+                    ch8->V[Vx] += ch8->V[Vy];
+                    break;
+                case 0x0005: // SUB Vx, Vy
+                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] > ch8->V[Vy];
+                    ch8->V[Vx] -= ch8->V[Vy];
+                    break;
+                case 0x0006: //SHR Vx {, Vy}
+                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] & 1;
+                    ch8->V[Vx] >>= 1;
+                    break;
+                case 0x0007: // SUBN Vx, Vy
+                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] < ch8->V[Vy];
+                    ch8->V[Vx] = ch8->V[Vy] - ch8->V[Vx];
+                    break; 
+                case 0x000E:
+
+                    break;
+
+            }
+
+
+    }
 }
 
 void decrement_timers(chip_8 *chip) {
