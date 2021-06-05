@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <time.h>
 #include <SDL2/SDL.h>
 
 #define memsize 0x1000
@@ -101,6 +102,7 @@ void initialize_chip(char *filepath) {
     for(int j = 0; j < memsize; j++) {
         printf("%x ", ch8.memory[j]);
     }
+    printf("15 >> 7 = %d", 15>>7);
 
 }
 
@@ -175,11 +177,32 @@ void chip8_opcodes(chip_8 *ch8) {
                     ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] < ch8->V[Vy];
                     ch8->V[Vx] = ch8->V[Vy] - ch8->V[Vx];
                     break; 
-                case 0x000E:
-
+                case 0x000E: // SHL Vx {, Vy}
+                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] >> 7;
+                    ch8->V[Vx] <<= 1;
                     break;
+        
 
             }
+        case 0x9000: // SNE Vx, Vy
+            if(ch8->V[Vx] != ch8->V[Vy]) ch8->pc += 2;
+            break;
+        case 0xA000: // LD I, addr
+            ch8->I = ch8->opcode & 0x0FFF;
+            break;
+        case 0xB000: // JP V0, addr
+            ch8->pc = (ch8->opcode & 0x0FFF) + ch8->V[0];
+            break;
+        case 0xC000: // RND, Vx, byte
+            ch8->V[Vx] = (ch8->opcode & 0x00FF) & (rand() % 0x100);
+            break;
+        case 0xD000: // DRW Vx, Vy, nibble
+
+            break;
+        case 0xE000: // SKNP Vx
+            if(ch8->keyboard[Vx]) ch8->pc += 2;
+            break;
+
 
 
     }
@@ -194,6 +217,7 @@ void decrement_timers(chip_8 *chip) {
 
 int main(int argc, char **argv) {
 
+    srand(time(0));
     printf("Test Mode: \n");
     initialize_chip(argv[1]);
     return 0;
