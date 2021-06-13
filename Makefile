@@ -5,7 +5,7 @@
 # Compiler settings - Can be customized.
 CC = gcc
 CXXFLAGS = -std=c11 -Wall
-LDFLAGS = 
+LDFLAGS = -lSDL2 -lGL -lGLEW -lSDL2_image -lSDL2_ttf -lm
 
 # Makefile settings - Can be customized.
 APPNAME = myapp
