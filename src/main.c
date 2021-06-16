@@ -115,7 +115,10 @@ void initialize_chip(char *filepath) {
         printf("%x ", ch8.memory[j]);
     }
     printf("NEW LINE : \n\n\n");
-    start_window(&ch8);
+    int d = 40;
+    d >>= 1;
+    printf("%d d\n", d);
+    //start_window(&ch8);
 
 }
 void print_screen(chip_8 *ch8) {
@@ -319,20 +322,63 @@ void chip8_opcodes(chip_8 *ch8) {
         case 0xD000: // Dxyn - DRW Vx, Vy, nibble
             height = (ch8->opcode & 0x000F);
             ch8->V[0xF] = 0;
+            
             for(int i = 0; i < height; i++) {
+
                 uint8_t sprite = ch8->memory[ch8->I + i];
+                int row = (ch8->V[Vy] + i) % 32;
 
                 for(int j = 0; j < 8; j++) {
-                    if((sprite & (0x80 >> j)) != 0) {
-                        if(get_pixel(ch8->V[Vx] + j, ch8->V[Vy] + i, ch8) != 0)
+
+                    int col = (ch8->V[Vx] + j) % 64;
+                    int offset = row*64 + col;
+
+                    if(((sprite & 0x80) >> 7) != 0) {
+
+                        if(get_pixel(col, row, ch8) != 0)
                             ch8->V[0xF] = 1; // collision
-                        ch8->display[ch8->V[Vx] + j + (ch8->V[Vy] + i) * SCREEN_WIDTH] ^= 1;
+
+                        ch8->display[offset] ^= 1;
                     }
+                    sprite <<= 1;
                 }
             }
             break;
         case 0xE000: // SKNP Vx
-            if(ch8->keyboard[Vx]) ch8->pc += 2;
+            switch(ch8->opcode & 0x000F) {
+                case 0x000E:
+                    if(ch8->keyboard[Vx]) ch8->pc += 2;
+                    break;  
+                case 0x0001:
+                    if(!ch8->keyboard[Vx]) ch8->pc += 2;
+                    break;
+            }
+            break;
+        case 0xF000:
+            switch(ch8->opcode & 0x00FF) {
+                case 0x0007:
+                    ch8->V[Vx] = ch8->delay_timer;
+                    break;
+                case 0x000A:
+                    for(int i = 0 ; i < 16; i++) {
+                        if(ch8->keyboard[i]) {
+                            ch8->V[Vx] = i;
+                        }
+                    }
+                    break;
+                case 0x0015:
+                    ch8->delay_timer = ch8->V[Vx];
+                    break;
+                case 0x0018:
+                    ch8->sound_timer = ch8->V[Vx];
+                    break;
+                case 0x001E:
+                    ch8->I += ch8->V[Vx];
+                    break;
+                case 0x0029:
+                    
+                    break;
+            }
             break;
 
 
