@@ -64,6 +64,8 @@ typedef struct chip_8 {
     uint8_t display[SCREEN_WIDTH*SCREEN_HEIGHT];
     uint8_t keyboard[0x10];
     uint16_t opcode;
+    uint8_t draw_flag;
+    SDL_Rect gfx[SCREEN_WIDTH*SCREEN_HEIGHT];
 
 
 } chip_8;
@@ -73,7 +75,7 @@ void start_window(chip_8 *ch8);
 int check_keys(SDL_Window *window, SDL_Event *event,chip_8 *ch8);
 void chip8_opcodes(chip_8 *ch8);
 void decrement_timers(chip_8 *chip);
-void draw_screen(SDL_Window *window, SDL_Surface *surface);
+void draw_screen(SDL_Window *window, SDL_Surface *surface,SDL_Renderer *rend, chip_8 *ch8);
 
 void initialize_chip(char *filepath) {
     chip_8 ch8;
@@ -83,6 +85,7 @@ void initialize_chip(char *filepath) {
     ch8.I = 0;
     ch8.delay_timer = 0;
     ch8.sound_timer = 0;
+    ch8.draw_flag = 0;
     memset(ch8.V, 0, sizeof(ch8.V));
     memset(ch8.stack, 0, sizeof(ch8.stack));
     memset(ch8.display, 0, sizeof(ch8.display));
@@ -105,7 +108,6 @@ void initialize_chip(char *filepath) {
             printf("bruh %lx\n", ftell(ch8.game));
         }
     }
-    /* while(1) { } */
 
     for(int i = 0; i < 80; i++) {
         ch8.memory[i] = font_set[i];
@@ -114,60 +116,80 @@ void initialize_chip(char *filepath) {
     for(int j = 0; j < memsize; j++) {
         printf("%x ", ch8.memory[j]);
     }
-    printf("NEW LINE : \n\n\n");
-    int d = 40;
-    d >>= 1;
-    printf("%d d\n", d);
-    //start_window(&ch8);
-
+    start_window(&ch8);
+    printf("DRAW FLAG IS %d", ch8.draw_flag);
 }
-void print_screen(chip_8 *ch8) {
-    static int test = 0;
-    if(test < 100) {
-        printf("NEW LINE : \n\n\n");
-        for(int i = 0; i < 2048; i++) {
-            printf("%d ", ch8->display[i]);
+void set_rectangles(chip_8 *ch8, SDL_Renderer *rend) {
+    for(int i = 0; i < SCREEN_HEIGHT; i++) {
+        int row = i%32;
+        for(int j = 0; j < SCREEN_WIDTH; j ++) {
+            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].w = 10*SCREEN_WIDTH;
+            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].h = 10*SCREEN_HEIGHT;
+            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].x = i % 32;
+            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].y = j % 64;
+            SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (j%64)]);
         }
-        test++;
     }
 }
 
 void start_window(chip_8 *ch8) {
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
+    SDL_Surface *surface = SDL_CreateRGBSurface(0, 10, 10, 0, 0, 0, 0, 0);
+    SDL_Renderer *rend = SDL_CreateRenderer(window, -1, 0);
+    SDL_SetRenderDrawColor(rend, 0,0,0, 0);
     SDL_Event event;
-
     int quit = 0;
     while(!quit) {
+        if(ch8->draw_flag) {
+            printf("DRAW FLAG IS %d\n", ch8->draw_flag);
+            draw_screen(window, surface,rend, ch8);
+        }
         quit = check_keys(window, &event, ch8);
         chip8_opcodes(ch8);
         decrement_timers(ch8);
-        print_screen(ch8);
+        SDL_Delay(3);   
     }
 }
 
-void draw_screen(SDL_Window *window, SDL_Surface * surface) {
-    SDL_Renderer *renderer;
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    SDL_Rect rectangles[16];
-    for(int i = 0 ; i < 16; i++) {
-        rectangles[i].w = 10;
-        rectangles[i].h = 10;
-
+void draw_screen(SDL_Window *window, SDL_Surface * surface, SDL_Renderer *rend, chip_8 *ch8) {
+    for(int i = 0; i < SCREEN_HEIGHT; i++) {
+        int row = i%32;
+        for(int j = 0; j < SCREEN_WIDTH; j ++) {
+            int col = j%64;
+            if(ch8->display[SCREEN_WIDTH*(row) + (col)]) {
+                SDL_SetRenderDrawColor(rend, 255, 255, 255, 0);
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].w = 10*SCREEN_WIDTH;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].h = 10*SCREEN_HEIGHT;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].x = col*10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].y = row*10;
+                SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (col)]);
+            } else {
+                SDL_SetRenderDrawColor(rend, 0, 0, 0, 0);
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].w = 10*SCREEN_WIDTH;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].h = 10*SCREEN_HEIGHT;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].x = col*10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].y = row*10;
+                SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (col)]);
+            }
+            
+        }
     }
-
-
+    
+    SDL_RenderPresent(rend);
+    ch8->draw_flag = 0;
 }
 
 int check_keys(SDL_Window *window, SDL_Event *event, chip_8 *ch8) {
     int quit = 0;
+    uint8_t check[16] = {49, 50, 51, 52, 113, 119, 101, 114, 97, 115, 100, 102, 122, 120, 99, 118};
     while(SDL_PollEvent(event)) {
         switch(event->type) {
             case SDL_QUIT:
                 quit = 1;
                 return quit;
             case SDL_KEYDOWN:
-                switch(event->key.keysym.sym) {
+                /*switch(event->key.keysym.sym) {
                     case SDLK_x:
                         ch8->keyboard[0x0] = 1;
                         break;
@@ -216,9 +238,70 @@ int check_keys(SDL_Window *window, SDL_Event *event, chip_8 *ch8) {
                     case SDLK_v:
                         ch8->keyboard[0xF] = 1;
                         break;
+                }*/
+                for(int i = 0; i < 16; i++) {
+                    if(event->key.keysym.sym == check[i]) {
+                        ch8->keyboard[i] = 1;
+                    } 
                 }
-            
-            
+                break;
+            case SDL_KEYUP:
+                /*switch(event->key.keysym.sym) {
+                    case SDLK_x:
+                        ch8->keyboard[0x0] = 0;
+                        break;
+                    case SDLK_1:
+                        ch8->keyboard[0x1] = 0;
+                        break;
+                    case SDLK_2:
+                        ch8->keyboard[0x2] = 0;
+                        break;
+                    case SDLK_3:
+                        ch8->keyboard[0x3] = 0;
+                        break;
+                    case SDLK_4:
+                        ch8->keyboard[0xC] = 0;
+                        break;
+                    case SDLK_q:
+                        ch8->keyboard[0x4] = 0;
+                        break;
+                    case SDLK_w:
+                        ch8->keyboard[0x5] = 0;
+                        break;
+                    case SDLK_e:
+                        ch8->keyboard[0x6] = 0;
+                        break;
+                    case SDLK_r:
+                        ch8->keyboard[0xD] = 0;
+                        break;
+                    case SDLK_a:
+                        ch8->keyboard[0x7] = 0;
+                        break;
+                    case SDLK_s:
+                        ch8->keyboard[0x8] = 0;
+                        break;
+                    case SDLK_d:
+                        ch8->keyboard[0x9] = 0;
+                        break;
+                    case SDLK_f:
+                        ch8->keyboard[0xE] = 0;
+                        break;
+                    case SDLK_z:
+                        ch8->keyboard[0xA] = 0;
+                        break;
+                    case SDLK_c:
+                        ch8->keyboard[0xB] = 0;
+                        break;
+                    case SDLK_v:
+                        ch8->keyboard[0xF] = 0;
+                        break;
+                }*/
+                for(int i = 0; i < 16; i++) {
+                    if(event->key.keysym.sym == check[i]) {
+                        ch8->keyboard[i] = 0;
+                    } 
+                }
+                break;
         }
     }
     return quit;
@@ -235,10 +318,10 @@ void chip8_opcodes(chip_8 *ch8) {
 
     uint8_t Vx = (ch8->opcode & 0x0F00) >> 8;
     uint8_t Vy = (ch8->opcode & 0x00F0) >> 4;
-    uint8_t height;
+    uint8_t height = 0;
     switch(ch8->opcode & 0xF000) {
         case 0x0000:
-            switch(ch8->opcode & 0x0FFF) {
+            switch(ch8->opcode & 0x00FF) {
                 case 0x00E0: //CLS
                     memset(ch8->display, 0, sizeof(ch8->display));
                     break;
@@ -247,6 +330,7 @@ void chip8_opcodes(chip_8 *ch8) {
                     ch8->sp--;
                     break;
             }
+            break;
         case 0x1000: //JMP
             ch8->pc = ch8->opcode & 0x0FFF;
             break;
@@ -307,6 +391,7 @@ void chip8_opcodes(chip_8 *ch8) {
         
 
             }
+            break;
         case 0x9000: // SNE Vx, Vy
             if(ch8->V[Vx] != ch8->V[Vy]) ch8->pc += 2;
             break;
@@ -335,14 +420,15 @@ void chip8_opcodes(chip_8 *ch8) {
 
                     if(((sprite & 0x80) >> 7) != 0) {
 
-                        if(get_pixel(col, row, ch8) != 0)
+                        if(ch8->display[(ch8->V[Vx] + j + ((ch8->V[Vy] + i)*64))] != 0)
                             ch8->V[0xF] = 1; // collision
 
-                        ch8->display[offset] ^= 1;
+                        ch8->display[(ch8->V[Vx] + j + ((ch8->V[Vy] + i)*64))] ^= 1;
                     }
                     sprite <<= 1;
                 }
             }
+            ch8->draw_flag = 1;
             break;
         case 0xE000: // SKNP Vx
             switch(ch8->opcode & 0x000F) {
@@ -376,7 +462,23 @@ void chip8_opcodes(chip_8 *ch8) {
                     ch8->I += ch8->V[Vx];
                     break;
                 case 0x0029:
-                    
+                    ch8->I = ch8->V[Vx] * 5;
+                    break;
+                case 0x0033:
+                    ch8->memory[ch8->I] = (ch8->V[Vx] % 1000 - ch8->V[Vx] % 100) / 100;
+                    ch8->memory[ch8->I+1] = (ch8->V[Vx] / 10) % 10;
+                    ch8->memory[ch8->I+2] = ch8->V[Vx] % 10;
+                    break;
+                case 0x0055:
+                    for(int i = 0; i <= Vx; i++) {
+                        ch8->memory[ch8->I+i] = ch8->V[i];
+                    }
+                    break;
+
+                case 0x0065:
+                    for(int i = 0; i <= Vx; i++) {
+                        ch8->V[i] = ch8->memory[ch8->I + i];
+                    }
                     break;
             }
             break;
