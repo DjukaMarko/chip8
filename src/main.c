@@ -173,129 +173,25 @@ void draw_screen(SDL_Window *window, SDL_Surface * surface, SDL_Renderer *rend, 
 int check_keys(SDL_Window *window, chip_8 *ch8) {
     SDL_Event event;
     int quit = 0;
-    //uint8_t check[16] = {49, 50, 51, 52, 113, 119, 101, 114, 97, 115, 100, 102, 122, 120, 99, 118};
+    uint8_t check[16] = {49, 50, 51, 52, 113, 119, 101, 114, 97, 115, 100, 102, 122, 120, 99, 118};
     while(SDL_PollEvent(&event)) {
         switch(event.type) {
             case SDL_QUIT:
                 quit = 1;
                 break;
             case SDL_KEYDOWN:
-                switch(event.key.keysym.sym) {
-                    case SDLK_1:
-                        ch8->keyboard[0x1] = 1;
-                        break;
-                    case SDLK_2:
-                        ch8->keyboard[0x2] = 1;
-                        break;
-                    case SDLK_3:
-                        ch8->keyboard[0x3] = 1;
-                        break;
-                    case SDLK_4:
-                        ch8->keyboard[0xC] = 1;
-                        break;
-                    case SDLK_q:
-                        ch8->keyboard[0x4] = 1;
-                        break;
-                    case SDLK_w:
-                        ch8->keyboard[0x5] = 1;
-                        break;
-                    case SDLK_e:
-                        ch8->keyboard[0x6] = 1;
-                        break;
-                    case SDLK_r:
-                        ch8->keyboard[0xD] = 1;
-                        break;
-                    case SDLK_a:
-                        ch8->keyboard[0x7] = 1;
-                        break;
-                    case SDLK_s:
-                        ch8->keyboard[0x8] = 1;
-                        break;
-                    case SDLK_d:
-                        ch8->keyboard[0x9] = 1;
-                        break;
-                    case SDLK_f:
-                        ch8->keyboard[0xE] = 1;
-                        break;
-                    case SDLK_z:
-                        ch8->keyboard[0xA] = 1;
-                        break;
-                    case SDLK_x:
-                        ch8->keyboard[0x0] = 1;
-                        break;
-                    case SDLK_c:
-                        ch8->keyboard[0xB] = 1;
-                        break;
-                    case SDLK_v:
-                        ch8->keyboard[0xF] = 1;
-                        break;
-                    default:
-                        break;
-                }
-                /*for(int i = 0; i < 16; i++) {
+                for(int i = 0; i < 16; i++) {
                     if(event.key.keysym.sym == check[i]) {
                         ch8->keyboard[i] = 1;
                     } 
-                }*/
+                }
                 break;
             case SDL_KEYUP:
-                switch(event.key.keysym.sym) {
-                    case SDLK_1:
-                        ch8->keyboard[0x1] = 0;
-                        break;
-                    case SDLK_2:
-                        ch8->keyboard[0x2] = 0;
-                        break;
-                    case SDLK_3:
-                        ch8->keyboard[0x3] = 0;
-                        break;
-                    case SDLK_4:
-                        ch8->keyboard[0xC] = 0;
-                        break;
-                    case SDLK_q:
-                        ch8->keyboard[0x4] = 0;
-                        break;
-                    case SDLK_w:
-                        ch8->keyboard[0x5] = 0;
-                        break;
-                    case SDLK_e:
-                        ch8->keyboard[0x6] = 0;
-                        break;
-                    case SDLK_r:
-                        ch8->keyboard[0xD] = 0;
-                        break;
-                    case SDLK_a:
-                        ch8->keyboard[0x7] = 0;
-                        break;
-                    case SDLK_s:
-                        ch8->keyboard[0x8] = 0;
-                        break;
-                    case SDLK_d:
-                        ch8->keyboard[0x9] = 0;
-                        break;
-                    case SDLK_f:
-                        ch8->keyboard[0xE] = 0;
-                        break;
-                    case SDLK_z:
-                        ch8->keyboard[0xA] = 0;
-                        break;
-                    case SDLK_x:
-                        ch8->keyboard[0x0] = 0;
-                        break;
-                    case SDLK_c:
-                        ch8->keyboard[0xB] = 0;
-                        break;
-                    case SDLK_v:
-                        ch8->keyboard[0xF] = 0;
-                        break;
-                    default:
-                        break;
-                }
-                /*for(int i = 0; i < 16; i++) {
+                for(int i = 0; i < 16; i++) {
                     if(event.key.keysym.sym == check[i]) {
                         ch8->keyboard[i] = 0;
                     } 
-                }*/
+                }
                 break;
 
             default:
