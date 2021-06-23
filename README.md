@@ -2,4 +2,4 @@
 chip8 emulator made in C
 PREVIEW:
 
-![Alt text](/home/djuka/Pictures/picture1.png?raw=true "CHIP8")
+![Alt text](https://ibb.co/BCbqv3x?raw=true "CHIP8")
