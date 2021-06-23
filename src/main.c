@@ -53,10 +53,11 @@ typedef struct chip_8 {
 } chip_8;
 
 
-void start_window(chip_8 *ch8);
+void start_window(chip_8 *ch8, const char* title);
 int check_keys(SDL_Window *window, chip_8 *ch8);
 void chip8_opcodes(chip_8 *ch8);
 void decrement_timers(chip_8 *chip);
+void cli_interface(chip_8 *ch8);
 void draw_screen(SDL_Window *window, SDL_Surface *surface,SDL_Renderer *rend, chip_8 *ch8);
 
 void initialize_chip(char *filepath) {
@@ -73,7 +74,6 @@ void initialize_chip(char *filepath) {
     memset(ch8.display, 0, sizeof(ch8.display));
     memset(ch8.keyboard, 0, sizeof(ch8.keyboard));
     memset(ch8.memory, 0, sizeof(ch8.memory));
-    //memcpy(ch8.keyboard, buffer_keys, sizeof(buffer_keys));
 
     ch8.game = fopen(filepath, "rb");
     
@@ -83,90 +83,74 @@ void initialize_chip(char *filepath) {
     } else {
         fseek(ch8.game, 0, SEEK_END);
         long size = ftell(ch8.game);
-        printf("Size of the game is 0x%lx\n", size);
+        printf("Size of the game is %ld (0x%lx)\n", size, size);
         fseek(ch8.game, 0, SEEK_SET);
         fread(ch8.memory+0x200, 1, size, ch8.game);
         if(feof(ch8.game)) {
-            printf("bruh %lx\n", ftell(ch8.game));
+            printf("END OF THE FILE. THE SIZE OF THE FILE IS: %lx\n", ftell(ch8.game));
         }
     }
 
     for(int i = 0; i < 80; i++) {
         ch8.memory[i] = font_set[i];
     }
-
-    for(int j = 0; j < memsize; j++) {
-        printf("%x ", ch8.memory[j]);
-    }
-
-    start_window(&ch8);
-    printf("\nDRAW FLAG IS %d", ch8.draw_flag);
-}
-void set_rectangles(chip_8 *ch8, SDL_Renderer *rend) {
-    for(int i = 0; i < SCREEN_HEIGHT; i++) {
-        int row = i%32;
-        for(int j = 0; j < SCREEN_WIDTH; j ++) {
-            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].w = 10*SCREEN_WIDTH;
-            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].h = 10*SCREEN_HEIGHT;
-            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].x = i % 32;
-            ch8->gfx[SCREEN_WIDTH*(row) + (j%64)].y = j % 64;
-            SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (j%64)]);
-        }
-    }
+    char s[strlen(filepath) + 14];
+    printf("Length of the filepath is: %lu\n", strlen(filepath));
+    sprintf(s, "(CHIP-8) - %s", filepath);
+    start_window(&ch8, s);
 }
 
-void start_window(chip_8 *ch8) {
+void print_keyboard(chip_8 *ch8) {
+    for(int i = 0; i < 16; i++) {
+        printf("%d ", ch8->keyboard[i]);
+    }
+}
+void start_window(chip_8 *ch8, const char* title) {
     SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Window *window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_SHOWN);
+    SDL_Window *window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_SHOWN);
     SDL_Surface *surface = SDL_CreateRGBSurface(0, 10, 10, 0, 0, 0, 0, 0);
     SDL_Renderer *rend = SDL_CreateRenderer(window, -1, 0);
     SDL_SetRenderDrawColor(rend, 0,0,0, 0);
-    //SDL_Event event;
+
     int quit = 0;
     while(!quit) {
         quit = check_keys(window, ch8);
         chip8_opcodes(ch8);
         if(ch8->draw_flag) {
-            printf("DRAW FLAG IS %d\n", ch8->draw_flag);
             draw_screen(window, surface,rend, ch8);
         }
         decrement_timers(ch8);
-        for(int i = 0; i < 16; i++) {
-            printf("%d ", ch8->keyboard[i]);
-        }
-        printf("\n");
-        SDL_Delay(2.5);   
+        SDL_Delay(2);
     }
 }
 
 void draw_screen(SDL_Window *window, SDL_Surface * surface, SDL_Renderer *rend, chip_8 *ch8) {
-    if(ch8->draw_flag) {
-        for(int i = 0; i < SCREEN_HEIGHT; i++) {
-            int row = i%32;
-            for(int j = 0; j < SCREEN_WIDTH; j ++) {
-                int col = j%64;
-                if(ch8->display[SCREEN_WIDTH*(row) + (col)]) {
-                    SDL_SetRenderDrawColor(rend, 255, 255, 255, 0);
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].w = 10*SCREEN_WIDTH;
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].h = 10*SCREEN_HEIGHT;
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].x = col*10;
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].y = row*10;
-                    SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (col)]);
-                } else {
-                    SDL_SetRenderDrawColor(rend, 0, 0, 0, 0);
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].w = 10*SCREEN_WIDTH;
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].h = 10*SCREEN_HEIGHT;
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].x = col*10;
-                    ch8->gfx[SCREEN_WIDTH*(row) + (col)].y = row*10;
-                    SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (col)]);
-                }
-            
+
+    for(int i = 0; i < SCREEN_HEIGHT; i++) {
+        int row = i%32;
+        for(int j = 0; j < SCREEN_WIDTH; j ++) {
+            int col = j%64;
+            if(ch8->display[SCREEN_WIDTH*(row) + (col)]) {
+                SDL_SetRenderDrawColor(rend, 255, 255, 100, 0);
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].w = 10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].h = 10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].x = col*10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].y = row*10;
+                SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (col)]);
+            } else {
+                SDL_SetRenderDrawColor(rend, 10, 100, 40, 0);
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].w = 10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].h = 10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].x = col*10;
+                ch8->gfx[SCREEN_WIDTH*(row) + (col)].y = row*10;
+                SDL_RenderFillRect(rend, &ch8->gfx[SCREEN_WIDTH*(row) + (col)]);
             }
+            
         }
-    
-        SDL_RenderPresent(rend);
-        ch8->draw_flag = 0;
     }
+    
+    SDL_RenderPresent(rend);
+    ch8->draw_flag = 0;
     
 }
 
@@ -201,19 +185,20 @@ int check_keys(SDL_Window *window, chip_8 *ch8) {
     return quit;
 }
 
-int get_pixel(int x, int y, chip_8 *ch8) {
-    return ch8->display[x + y*SCREEN_WIDTH];
+int get_pixel(chip_8 *ch8, int offset) {
+    return ch8->display[offset];
 }
 
 
 void chip8_opcodes(chip_8 *ch8) {
     ch8->opcode = ch8->memory[ch8->pc] << 8 | ch8->memory[ch8->pc + 1];
-    printf("Current opcode %x\n", ch8->opcode);
+    fflush(stdout);
     ch8->pc += 2;
 
     uint8_t Vx = (ch8->opcode & 0x0F00) >> 8;
     uint8_t Vy = (ch8->opcode & 0x00F0) >> 4;
     uint8_t height = 0;
+    uint8_t key_pressed = 0;
     switch(ch8->opcode & 0xF000) {
         case 0x0000:
             switch(ch8->opcode & 0x00FF) {
@@ -221,8 +206,7 @@ void chip8_opcodes(chip_8 *ch8) {
                     memset(ch8->display, 0, sizeof(ch8->display));
                     break;
                 case 0x00EE: //RET
-                    ch8->pc = ch8->stack[ch8->sp];
-                    ch8->sp--;
+                    ch8->pc = ch8->stack[--ch8->sp];
                     break;
             }
             break;
@@ -230,8 +214,7 @@ void chip8_opcodes(chip_8 *ch8) {
             ch8->pc = ch8->opcode & 0x0FFF;
             break;
         case 0x2000: //CALL
-            ch8->sp++;
-            ch8->stack[ch8->sp] = ch8->pc;
+            ch8->stack[ch8->sp++] = ch8->pc;
             ch8->pc = ch8->opcode & 0x0FFF;
             break;
         case 0x3000: //SE Vx, byte
@@ -264,23 +247,24 @@ void chip8_opcodes(chip_8 *ch8) {
                     ch8->V[Vx] ^= ch8->V[Vy];
                     break;
                 case 0x0004: // ADD Vx, Vy
-                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] + ch8->V[Vy] > 0xFF;
+                    ch8->V[15] = (ch8->V[Vx] + ch8->V[Vy]) > 0xFF;
                     ch8->V[Vx] += ch8->V[Vy];
+
                     break;
                 case 0x0005: // SUB Vx, Vy
-                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] > ch8->V[Vy];
+                    ch8->V[15] = ch8->V[Vx] > ch8->V[Vy];
                     ch8->V[Vx] -= ch8->V[Vy];
                     break;
                 case 0x0006: //SHR Vx {, Vy}
-                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] & 1;
+                    ch8->V[15] = ch8->V[Vx] & 1;
                     ch8->V[Vx] >>= 1;
                     break;
                 case 0x0007: // SUBN Vx, Vy
-                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] < ch8->V[Vy];
+                    ch8->V[15] = ch8->V[Vx] <= ch8->V[Vy];
                     ch8->V[Vx] = ch8->V[Vy] - ch8->V[Vx];
                     break; 
                 case 0x000E: // SHL Vx {, Vy}
-                    ch8->V[sizeof(ch8->V) - 1] = ch8->V[Vx] >> 7;
+                    ch8->V[15] = ch8->V[Vx] >> 7;
                     ch8->V[Vx] <<= 1;
                     break;
         
@@ -297,7 +281,8 @@ void chip8_opcodes(chip_8 *ch8) {
             ch8->pc = (ch8->opcode & 0x0FFF) + ch8->V[0];
             break;
         case 0xC000: // RND, Vx, byte
-            ch8->V[Vx] = (ch8->opcode & 0x00FF) & (rand() % 0x100);
+            ch8->V[Vx] = (ch8->opcode & 0x00FF) & (rand() % 255);
+            printf("Number %d\n", ch8->V[Vx]);
             break;
         case 0xD000: // Dxyn - DRW Vx, Vy, nibble
             height = (ch8->opcode & 0x000F);
@@ -313,14 +298,14 @@ void chip8_opcodes(chip_8 *ch8) {
                     int col = (ch8->V[Vx] + j) % 64;
                     int offset = row*64 + col;
 
-                    if(((sprite & 0x80) >> 7) != 0) {
+                    if((sprite & (0x80 >> j)) != 0) {
 
-                        if(ch8->display[(ch8->V[Vx] + j + ((ch8->V[Vy] + i)*64))] != 0)
+                        if(get_pixel(ch8,offset)){
                             ch8->V[0xF] = 1; // collision
+                        }
 
-                        ch8->display[(ch8->V[Vx] + j + ((ch8->V[Vy] + i)*64))] ^= 1;
+                        ch8->display[offset] ^= 1;
                     }
-                    sprite <<= 1;
                 }
             }
             ch8->draw_flag = 1;
@@ -344,11 +329,12 @@ void chip8_opcodes(chip_8 *ch8) {
                     break;
                 case 0x000A:
                     for(int i = 0 ; i < 16; i++) {
-                        if(ch8->keyboard[i]) {
+                        if(ch8->keyboard[i] != 0) {
                             ch8->V[Vx] = i;
+                            key_pressed = 1;
                         }
-                        break;
                     }
+                    if(!key_pressed) ch8->pc -= 2;
                     break;
                 case 0x0015:
                     ch8->delay_timer = ch8->V[Vx];
@@ -363,9 +349,9 @@ void chip8_opcodes(chip_8 *ch8) {
                     ch8->I = ch8->V[Vx] * 5;
                     break;
                 case 0x0033:
-                    ch8->memory[ch8->I] = (ch8->V[Vx] % 1000 - ch8->V[Vx] % 100) / 100;
+                    ch8->memory[ch8->I] = (ch8->V[Vx]) / 100;
                     ch8->memory[ch8->I+1] = (ch8->V[Vx] / 10) % 10;
-                    ch8->memory[ch8->I+2] = ch8->V[Vx] % 10;
+                    ch8->memory[ch8->I+2] = (ch8->V[Vx] % 100) % 10;
                     break;
                 case 0x0055:
                     for(int i = 0; i <= Vx; i++) {
@@ -391,10 +377,17 @@ void decrement_timers(chip_8 *chip) {
     if(chip->sound_timer > 0) chip->sound_timer--;
 }
 
+void cli_interface(chip_8 *ch8) {
+    printf("\rWELCOME TO THE CHIP-8 EMULATOR MADE BY DJUKAMARKO. "
+           "THE LATEST VERSION IS 1.2 WHICH WAS UPDATED ON THE JUNE 23rd. "
+           "CURRENT OPCODE: %x ", ch8->opcode);
+    fflush(stdout);
+
+}
+
 
 
 int main(int argc, char **argv) {
-
     srand(time(0));
     printf("Test Mode: \n");
     initialize_chip(argv[1]);
