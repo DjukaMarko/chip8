@@ -120,7 +120,7 @@ void start_window(chip_8 *ch8, const char* title) {
             draw_screen(window, surface,rend, ch8);
         }
         decrement_timers(ch8);
-        SDL_Delay(2);
+        SDL_Delay(3);
     }
 }
 
